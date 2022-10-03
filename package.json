@@ -1,0 +1,19 @@
+{
+  "name": "automatic_data_recovery_smart_contract_event_listeners",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "cd33",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.0.2",
+    "ethers": "^5.7.1",
+    "express": "^4.18.1",
+    "firebase-admin": "^11.0.1",
+    "nodemon": "^2.0.20"
+  }
+}
