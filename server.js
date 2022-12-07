@@ -33,6 +33,12 @@ const address721 = 'XXX'
 const Contract721 = require('./Bibs721.json')
 const contract721 = new ethers.Contract(address721, Contract721.abi, provider)
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
 // FONCTIONS RECUPERATION BLOCKCHAIN ET ECRITURE BDD
 async function getFrontDataFromETH() {
   const data = await blockchain.getFrontData()
@@ -135,6 +141,20 @@ async function eventPauseUpdatedNFT() {
 }
 
 async function eventTransferMint(to, id) {
+  const dataBalance = await db.collection('Balance').doc(to).get()
+  if (!dataBalance.data() || !dataBalance.data().ownedTokens) {
+    const ownedTokens = []
+    await db
+      .collection('Balance')
+      .doc(to)
+      .set({ ownedTokens })
+      .then(() => {
+        console.log('ownedTokens ' + to + ' created')
+      })
+      .catch((err) => console.log('eventTransferBalance ' + to + ', ' + err))
+    await sleep(2000) // Pour laisser le temps à firestore d'initier l'array
+  }
+
   const dataFront = await blockchain.eventTransferMintFront()
   await db
     .collection('Front')
@@ -145,74 +165,59 @@ async function eventTransferMint(to, id) {
     })
     .catch((err) => console.log('eventTransferMintFront, ', err))
 
-  const dataBalance = await db.collection('Balance').doc(to).get()
-  if (dataBalance.data() && dataBalance.data().ownedTokens) {
-    let ownedTokens = dataBalance.data().ownedTokens
-    ownedTokens.push(parseInt(id))
-    await db
-      .collection('Balance')
-      .doc(to)
-      .update({ ownedTokens })
-      .then(() => {
-        console.log('eventTransferBalance, Success: Data writed in db')
-      })
-      .catch((err) => console.log('eventTransferBalance, ', err))
-  } else {
-    const ownedTokens = [parseInt(id)]
-    await db
-      .collection('Balance')
-      .doc(to)
-      .set({ ownedTokens })
-      .then(() => {
-        console.log('eventTransferBalance, Success: Data writed in db')
-      })
-      .catch((err) => console.log('eventTransferBalance, ', err))
-  }
+  await db
+    .collection('Balance')
+    .doc(to)
+    .update({
+      ownedTokens: admin.firestore.FieldValue.arrayUnion(parseInt(id)),
+    })
+    .then(() => {
+      console.log('eventTransferBalance ' + to + ', Success: Data writed in db')
+    })
+    .catch((err) => console.log('eventTransferBalance, ', err))
 }
 
 async function eventTransferBalance(from, to, id) {
-  const dataBalanceFrom = await db.collection('Balance').doc(from).get()
   const dataBalanceTo = await db.collection('Balance').doc(to).get()
-
-  if (dataBalanceFrom.data() && dataBalanceFrom.data().ownedTokens) {
-    let ownedTokens = dataBalanceFrom.data().ownedTokens
-    const index = ownedTokens.indexOf(parseInt(id))
-    if (index > -1) {
-      // only splice array when item is found
-      ownedTokens.splice(index, 1) // 2nd parameter means remove one item only
-    }
-    await db
-      .collection('Balance')
-      .doc(from)
-      .update({ ownedTokens })
-      .then(() => {
-        console.log('eventTransferBalance, Success: Data writed in db')
-      })
-      .catch((err) => console.log('eventTransferBalance, ', err))
-  }
-
-  if (dataBalanceTo.data() && dataBalanceTo.data().ownedTokens) {
-    let ownedTokens = dataBalanceTo.data().ownedTokens
-    ownedTokens.push(parseInt(id))
-    await db
-      .collection('Balance')
-      .doc(to)
-      .update({ ownedTokens })
-      .then(() => {
-        console.log('eventTransferBalance, Success: Data writed in db')
-      })
-      .catch((err) => console.log('eventTransferBalance, ', err))
-  } else {
-    const ownedTokens = [parseInt(id)]
+  if (!dataBalanceTo.data() || !dataBalanceTo.data().ownedTokens) {
+    const ownedTokens = []
     await db
       .collection('Balance')
       .doc(to)
       .set({ ownedTokens })
       .then(() => {
-        console.log('eventTransferBalance, Success: Data writed in db')
+        console.log('ownedTokens ' + to + ' created')
+      })
+      .catch((err) => console.log('eventTransferBalance ' + to + ', ' + err))
+    await sleep(2000) // Pour laisser le temps à firestore d'initier l'array
+  }
+
+  const dataBalanceFrom = await db.collection('Balance').doc(from).get()
+  if (dataBalanceFrom.data() && dataBalanceFrom.data().ownedTokens) {
+    await db
+      .collection('Balance')
+      .doc(from)
+      .update({
+        ownedTokens: admin.firestore.FieldValue.arrayRemove(parseInt(id)),
+      })
+      .then(() => {
+        console.log(
+          'eventTransferBalance ' + from + ', Success: Data writed in db',
+        )
       })
       .catch((err) => console.log('eventTransferBalance, ', err))
   }
+
+  await db
+    .collection('Balance')
+    .doc(to)
+    .update({
+      ownedTokens: admin.firestore.FieldValue.arrayUnion(parseInt(id)),
+    })
+    .then(() => {
+      console.log('eventTransferBalance ' + to + ', Success: Data writed in db')
+    })
+    .catch((err) => console.log('eventTransferBalance ' + to + ', ' + err))
 }
 
 const PORT = process.env.PORT || 8080
@@ -220,8 +225,8 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`)
 })
 
-// getFrontDataFromETH()
 eventsListeners()
+// getFrontDataFromETH()
 
 // // TESTS LISTENERS
 // eventInitializedMint()
