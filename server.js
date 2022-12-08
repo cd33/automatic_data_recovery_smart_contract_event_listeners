@@ -220,21 +220,71 @@ async function eventTransferBalance(from, to, id) {
     .catch((err) => console.log('eventTransferBalance ' + to + ', ' + err))
 }
 
+async function backUpBalanceSingle(address) {
+  const backUpBalance = await blockchain.backUpBalanceSingle(address)
+  const ownedTokens = backUpBalance.tempArray
+  console.log('ownedTokens', ownedTokens)
+  await db
+    .collection('Balance')
+    .doc(backUpBalance.address)
+    .set({ ownedTokens })
+    .then(() => {
+      console.log('backUpBalance, Success: Data writed in db')
+    })
+    .catch((err) => console.log('backUpBalance, ', err))
+}
+
+async function backUpBalance() {
+  const backUpBalance = await blockchain.backUpBalance()
+
+  for (const result of backUpBalance.results) {
+    await db
+      .collection('Balance')
+      .doc(result.address)
+      .set({ ownedTokens: result.ownedTokens })
+      .then(() => {
+        console.log('backUpBalance, Success: Data writed in db')
+      })
+      .catch((err) => console.log('backUpBalance, ', err))
+  }
+}
+
+async function backUp() {
+  await getFrontDataFromETH()
+
+  // // 2 méthodes pour récupérer les owners de NFTs
+  // // N°1 : à partir des Events
+
+  // // const listStakingEvents = ['Transfer', 'InitializedMint', "PriceUpdated", "PauseUpdated"]
+  // const eventsStaking = await contract721.queryFilter('Transfer', 0, 'latest') // "*" pour tous les events
+  // // const result = eventsStaking.filter(
+  // //   (event) => listStakingEvents.includes(event.event) && event.event,
+  // // )
+  // const addresses = []
+  // function addItem(arr, item) {
+  //   if (arr.indexOf(item) == -1) {
+  //     addresses.push(item)
+  //   }
+  // }
+  // eventsStaking.map((event) => {
+  //   if (event.args.from !== '0x0000000000000000000000000000000000000000') {
+  //     addItem(addresses, event.args.from)
+  //   }
+  //   addItem(addresses, event.args.to)
+  // })
+
+  // for (const address of addresses) {
+  //   await backUpBalanceSingle(address)
+  // }
+
+  // // N°2 : en scannant chaque ownerOf(i) avec comme limit nextNFT, mettre dans un array les résultats
+  await backUpBalance()
+}
+
 const PORT = process.env.PORT || 8080
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`)
 })
 
 eventsListeners()
-// getFrontDataFromETH()
-
-// // TESTS LISTENERS
-// eventInitializedMint()
-// eventPriceUpdated()
-// eventPauseUpdatedNFT()
-// eventTransferMint("0xdB4D6160532835f8Be98f3682eD165D5Ce02ECf9", 2)
-// eventTransferBalance(
-//   '0xdB4D6160532835f8Be98f3682eD165D5Ce02ECf9',
-//   '0xD9453F5E2696604703076835496F81c3753C3Bb3',
-//   2,
-// )
+// backUp()

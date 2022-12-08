@@ -41,5 +41,42 @@ module.exports = {
   eventTransferMintFront: async function eventTransferMintFront() {
     const nextNFT = await contract721.nextNFT()
     return { nextNFT }
-  }
+  },
+
+  backUpBalanceSingle: async function backUpBalanceSingle(address) {
+    let tempArray = []
+    const nextNFT = await contract721.nextNFT()
+
+    console.log('Récupération des NFTs en cours...')
+    for (let i = 1; i <= nextNFT; i++) {
+      console.log('i', i)
+      const ownerNFT = await contract721.ownerOf(i)
+      if (address === ownerNFT) {
+        tempArray.push(i)
+      }
+    }
+    return { address, tempArray }
+  },
+
+  backUpBalance: async function backUpBalance() {
+    let results = []
+    const nextNFT = await contract721.nextNFT()
+    const addresses = []
+
+    console.log('Récupération des NFTs en cours...')
+    for (let i = 1; i <= nextNFT; i++) {
+      console.log('i', i)
+      const ownerNFT = await contract721.ownerOf(i)
+
+      if (addresses.includes(ownerNFT)) {
+        const tempArray = results.filter(e => e.address === ownerNFT)
+        tempArray[0].ownedTokens.push(i)
+        results.map(e => e.address === ownerNFT ? {...e, tempArray} : e);
+      } else {
+        addresses.push(ownerNFT)
+        results.push({address: ownerNFT, ownedTokens: [i]})
+      }
+    }
+    return { results }
+  },
 }
